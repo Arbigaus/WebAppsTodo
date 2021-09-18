@@ -25,7 +25,21 @@ final class HomeViewController: UIViewController {
             navigateToLogin()
         }
     }
-    var todoList: [TodoList] = []
+    var todoList: [TodoItem] = [] {
+        didSet {
+            list = [todoList, todoListDone]
+        }
+    }
+    var todoListDone: [TodoItem] = [] {
+        didSet {
+            list = [todoList, todoListDone]
+        }
+    }
+    var list: [[TodoItem]] = [] {
+        didSet {
+            contentView.tableView.reloadData()
+        }
+    }
 
     // MARK: - View's
 
@@ -54,19 +68,45 @@ final class HomeViewController: UIViewController {
 
         setUpBindings()
         setupViews()
+        setupTableView()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.navigationBar.isHidden = false
+        navigationItem.setHidesBackButton(true, animated: true)
 
         viewModel.getUserData()
     }
 
-    private func setupViews() {
-        navigationController?.navigationBar.isHidden = true
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
 
+        title = ""
+    }
+
+    // MARK: - setupViews
+
+    private func setupViews() {
+        let newItemButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(self.barButtonClickAction))
+        navigationItem.rightBarButtonItem = newItemButton
+
+        contentView.logoutButton.addAction { [weak self] in
+            self?.viewModel.signOut()
+        }
+    }
+
+    private func setupTableView() {
         contentView.tableView.register(TodoCell.self, forCellReuseIdentifier: "TodoCell")
         contentView.tableView.delegate = self
         contentView.tableView.dataSource = self
     }
 
     // MARK: - Functions
+
+    @objc func barButtonClickAction() {
+        navigateToNewTodo()
+    }
 
     // MARK: - Setup Bindings
 
@@ -92,7 +132,7 @@ final class HomeViewController: UIViewController {
             viewModel.$name
                 .receive(on: RunLoop.main)
                 .sink { [weak self] value in
-                    self?.contentView.titleLabel.text = value
+                    self?.title = value
                 }
                 .store(in: &bindings)
 
@@ -100,7 +140,13 @@ final class HomeViewController: UIViewController {
                 .receive(on: RunLoop.main)
                 .sink { [weak self] value in
                     self?.todoList = value
-                    self?.contentView.tableView.reloadData()
+                }
+                .store(in: &bindings)
+
+            viewModel.$todoListDone
+                .receive(on: RunLoop.main)
+                .sink { [weak self] value in
+                    self?.todoListDone = value
                 }
                 .store(in: &bindings)
         }
@@ -116,11 +162,21 @@ final class HomeViewController: UIViewController {
             navigationController?.pushViewController(LoginViewController(), animated: true)
         }
     }
+
+    private func navigateToNewTodo() {
+        navigationController?.pushViewController(NewTodoViewController(), animated: true)
+    }
 }
+
+// MARK: - UITableViewDelegate, UITableViewDataSource
 
 extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return todoList.count
+        return list[section].count
+    }
+
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return list.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -128,8 +184,42 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
                 as? TodoCell else {
             return UITableViewCell()
         }
-        cell.configure(with: todoList[indexPath.row])
+        cell.selectionStyle = .none
+        cell.configure(with: list[indexPath.section][indexPath.row])
 
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return section == 0 ? "TODO" : "DONE"
+    }
+
+    func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+
+        let trash = UIContextualAction(style: .destructive,
+                                       title: "Apagar") { [weak self] (action, view, completionHandler) in
+            guard let self = self else { return }
+            self.viewModel.removeTodoItem(item: self.list[indexPath.section][indexPath.row])
+            completionHandler(true)
+        }
+        trash.backgroundColor = .systemRed
+
+        let configuration = UISwipeActionsConfiguration(actions: [trash])
+
+        return configuration
+    }
+
+    func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        let done = UIContextualAction(style: .destructive,
+                                       title: "Done") { [weak self] (action, view, completionHandler) in
+            guard let self = self else { return }
+            self.viewModel.doneTodo(item: self.list[indexPath.section][indexPath.row])
+            completionHandler(true)
+        }
+        done.backgroundColor = .systemGreen
+
+        let configuration = UISwipeActionsConfiguration(actions: [done])
+
+        return indexPath.section == 0 ? configuration : nil
     }
 }

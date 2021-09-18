@@ -51,7 +51,6 @@ final class LoginViewController: UIViewController {
 
     private func setupViews() {
         contentView.signInButton.addAction { [weak self] in
-            print("SignOn")
             self?.navigationController?.pushViewController(SignOnViewController(), animated: true)
         }
 
@@ -105,7 +104,7 @@ final class LoginViewController: UIViewController {
         bindViewModelToView()
     }
 
-    // MARK: - Functions
+    // MARK: - Navigations
 
     fileprivate func navigateToHome() {
         if didLogin {

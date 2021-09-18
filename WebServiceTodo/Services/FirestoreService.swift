@@ -10,6 +10,7 @@ import FirebaseFirestore
 
 final class FirestoreService {
     fileprivate let db = Firestore.firestore()
+    private let authService = FirebaseAuthService()
 
     public func createUserDocument(id: String,
                                    name: String,
@@ -36,19 +37,23 @@ final class FirestoreService {
         }
     }
 
-    public func getUser(id: String, onSuccess: @escaping  (User) -> Void, onError: @escaping (String) -> Void) {
-        let docRef = db.collection("users").document(id)
+    public func getUser(onSuccess: @escaping (User) -> Void, onError: @escaping (String) -> Void) {
+        guard let userId = authService.userId() else {
+            onError("User not logged")
+            return
+        }
+        let docRef = db.collection("users").document(userId)
 
         docRef.getDocument { document, error in
             if let document = document, document.exists {
                 let data = document.data()
                 let name = data?["name"] as? String ?? ""
-                var todoList: [TodoList] = []
+                var todoList: [TodoItem] = []
 
                 if let list = data?["todoList"] as? [Any] {
                     list.forEach({ item  in
                         if let todo = item as? [String: Any] {
-                            todoList.append(TodoList(title: todo["title"] as? String ?? "",
+                            todoList.append(TodoItem(title: todo["title"] as? String ?? "",
                                             description: todo["description"] as? String ?? "",
                                             status: todo["status"] as? String ?? ""))
                         }
@@ -64,14 +69,77 @@ final class FirestoreService {
             }
         }
     }
+
+    public func addTodo(todo: TodoItem, onSuccess: @escaping () -> Void, onError: @escaping (String) -> Void) {
+        guard let userId = authService.userId() else {
+            onError("User not logged")
+            return
+        }
+        let docRef = db.collection("users").document(userId)
+
+        let todoItem: [String: Any] = ["title": todo.title,
+                                       "description": todo.description,
+                                       "status": todo.status]
+
+        docRef.updateData([
+            "todoList": FieldValue.arrayUnion([todoItem])
+        ]) { error in
+            guard error != nil else {
+                onSuccess()
+                return
+            }
+            print(error.debugDescription)
+            onError(error.debugDescription)
+        }
+    }
+
+    public func removeTodo(todo: TodoItem, onSuccess: @escaping () -> Void, onError: @escaping (String) -> Void) {
+        guard let userId = authService.userId() else {
+            onError("User not logged")
+            return
+        }
+        let docRef = db.collection("users").document(userId)
+
+        let todoItem: [String: Any] = ["title": todo.title,
+                                       "description": todo.description,
+                                       "status": todo.status]
+
+        docRef.updateData([
+            "todoList": FieldValue.arrayRemove([todoItem])
+        ]) { error in
+            guard error != nil else {
+                onSuccess()
+                return
+            }
+            print(error.debugDescription)
+            onError(error.debugDescription)
+        }
+    }
+
+    public func makeTodoDone(todo: TodoItem, onSuccess: @escaping () -> Void, onError: @escaping (String) -> Void) {
+        let todoToRemove = TodoItem(title: todo.title, description: todo.description, status: "active")
+
+        removeTodo(todo: todoToRemove) { [weak self] in
+            self?.addTodo(todo: todo) {
+                onSuccess()
+            } onError: { error in
+                onError(error)
+            }
+
+        } onError: { error in
+            onError(error)
+        }
+
+    }
+
 }
 
 public struct User: Codable {
     let name: String
-    let todoList: [TodoList]?
+    let todoList: [TodoItem]?
 }
 
-public struct TodoList: Codable {
+public struct TodoItem: Codable {
     let title: String
     let description: String
     let status: String

@@ -12,17 +12,17 @@ import UIKit
 final class HomeView: UIView {
     // MARK: - View's
 
-    lazy var titleLabel = UILabel() <-< {
-        $0.textAlignment = .center
-        $0.textColor = .black
-    }
-
     lazy var tableView = UITableView() <-< {
         $0.rowHeight = UITableView.automaticDimension
         $0.backgroundColor = .white
         $0.showsVerticalScrollIndicator = false
         $0.backgroundColor = .clear
         $0.separatorStyle = .none
+    }
+
+    lazy var logoutButton = UIButton() <-< {
+        $0.setTitle("Sair", for: .normal)
+        $0.setTitleColor(.darkGray, for: .normal)
     }
 
     // MARK: - Variables
@@ -44,14 +44,16 @@ final class HomeView: UIView {
     // MARK: - Functions
 
     private func addSubviews() {
-        addSubview(titleLabel) { make in
+        addSubview(logoutButton) { make in
+            make.bottom.equalToSuperview().inset(32)
+            make.width.equalTo(200)
+            make.height.equalTo(48)
             make.centerX.equalToSuperview()
-            make.top.equalToSuperview().inset(100)
-            make.width.equalToSuperview().multipliedBy(0.8)
         }
         addSubview(tableView) { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(32)
-            make.leading.trailing.bottom.equalToSuperview().inset(24)
+            make.top.equalToSuperview().inset(100)
+            make.leading.trailing.equalToSuperview().inset(24)
+            make.bottom.equalTo(logoutButton.snp.top).offset(-32)
         }
 
     }
@@ -70,7 +72,7 @@ extension HomeViewController {
             $0.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         }
 
-        public func configure(with item: TodoList) {
+        public func configure(with item: TodoItem) {
             titleLabel.text = item.title
             descriptionLabel.text = item.description
 
@@ -79,11 +81,13 @@ extension HomeViewController {
 
         private func configureView() {
             contentView.addSubview(titleLabel) { make in
-                make.top.leading.trailing.equalToSuperview().inset(16)
+                make.top.equalToSuperview().inset(16)
+                make.leading.trailing.equalToSuperview()
             }
             contentView.addSubview(descriptionLabel) { make in
                 make.top.equalTo(titleLabel.snp.bottom).offset(8)
-                make.leading.trailing.bottom.equalToSuperview().inset(16)
+                make.leading.trailing.equalToSuperview()
+                make.bottom.equalToSuperview().inset(16)
             }
         }
     }

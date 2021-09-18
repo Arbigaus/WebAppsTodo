@@ -17,7 +17,8 @@ final class HomeViewModel {
     @Published var title = ""
     @Published var text = ""
     @Published var name = ""
-    @Published var todoList: [TodoList] = []
+    @Published var todoList: [TodoItem] = []
+    @Published var todoListDone: [TodoItem] = []
 
     // MARK: - Variables
 
@@ -28,16 +29,41 @@ final class HomeViewModel {
 
     public func getUserData() {
         isLoading = true
-        guard let userId = authService.userId() else { return }
-        firestoreService.getUser(id: userId) { [weak self] user in
-            self?.name = user.name
-            self?.todoList = user.todoList ?? []
+
+        firestoreService.getUser() { [weak self] user in
+            self?.name =  "Olá, \(user.name)"
+            self?.todoList = user.todoList?.filter { $0.status == "active" } ?? []
+            self?.todoListDone = user.todoList?.filter { $0.status == "done" } ?? []
             self?.isLoading = false
             } onError: { [weak self] _ in
                 self?.signOut()
             }
     }
 
+    public func removeTodoItem(item: TodoItem) {
+        isLoading = true
+
+        firestoreService.removeTodo(todo: item) { [weak self] in
+            self?.isLoading = false
+            self?.getUserData()
+        } onError: { error in
+            self.isLoading = false
+            print(error)
+        }
+    }
+
+    public func doneTodo(item: TodoItem) {
+        isLoading = true
+
+        let todo = TodoItem(title: item.title, description: item.description, status: "done")
+        firestoreService.makeTodoDone(todo: todo) {[weak self] in
+            self?.isLoading = false
+            self?.getUserData()
+        } onError: { error in
+            self.isLoading = false
+            print(error)
+        }
+    }
 
     public func signOut() {
         didSignOut = authService.signOut()
